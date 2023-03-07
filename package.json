@@ -23,12 +23,16 @@
     "@typescript-eslint/eslint-plugin": "^5.53.0",
     "@typescript-eslint/parser": "^5.53.0",
     "autoprefixer": "^10.4.7",
+    "chalk": "^5.2.0",
+    "cheerio": "^1.0.0-rc.12",
     "eslint": "^8.34.0",
     "eslint-config-next": "^13.2.1",
+    "pdf2json": "^3.0.3",
     "postcss": "^8.4.14",
     "prettier": "^2.8.1",
     "prettier-plugin-tailwindcss": "^0.2.1",
     "tailwindcss": "^3.2.0",
+    "tsx": "^3.12.3",
     "typescript": "^4.9.5"
   },
   "ct3aMetadata": {
