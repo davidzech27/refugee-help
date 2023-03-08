@@ -6,7 +6,7 @@ import { redis } from "~/lib/redis";
 
 const keys = {
   htmlUrls: "uscishtmlurls",
-  htmlData: "uscishtmldata",
+  dataFromUrl: ({}: { url: string }) => ``,
 };
 
 const useScraper = true;
