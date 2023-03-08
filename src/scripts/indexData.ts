@@ -3,7 +3,7 @@ import readline from "readline";
 import chalk from "chalk";
 import { scraperApiKey } from "./scraperApiKey";
 import { PineconeClient } from "@pinecone-database/pinecone";
-import { env } from "~/env.mjs";
+import env from "~/env";
 import { redis } from "~/lib/redis";
 import { OpenAIApi, Configuration } from "openai";
 import crypto from "crypto";

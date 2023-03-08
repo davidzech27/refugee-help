@@ -1,6 +1,6 @@
 import { OpenAIApi, Configuration, ChatCompletionRequestMessage } from "openai";
 import { PineconeClient } from "@pinecone-database/pinecone";
-import { env } from "~/env.mjs";
+import env from "~/env";
 import readline from "readline";
 import type { PineconeVector } from "./indexData";
 
