@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 import readline from "readline";
 import chalk from "chalk";
-import { scraperApiKey } from "./scraperApiKey";
+import { scraperApiKey } from "./lib/scraperApiKey";
 import { redis } from "~/lib/redis";
 
 const keys = {
