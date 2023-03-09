@@ -8,7 +8,7 @@ import { datasetStartingLinks } from "~/lib/datasets";
 import selectedDataset from "./selectedDataset";
 import { keys } from "~/lib/redis";
 
-const MAX_CONCURRENT_FUNCTION_CALLS = 5;
+const MAX_CONCURRENT_FUNCTION_CALLS = 10;
 
 const concurrencyLimiter = new ConcurrencyLimiter(
 	MAX_CONCURRENT_FUNCTION_CALLS,
@@ -34,28 +34,28 @@ const main = async () => {
 			console.error(chalk.red(JSON.stringify({ url, error }, null, 4)));
 		},
 		(url) => {
-			return !(
-				(!url.includes("asylum") && selectedDataset !== "uscis") ||
-				(selectedDataset === "uscis" &&
-					(!url.includes("uscis") ||
-						url.includes("uscis.gov/es") ||
-						url.includes("history") ||
-						url.includes("www.asylumlawdatabase.eu"))) ||
-				url.includes("mailto") ||
-				url.includes("facebook") ||
-				url.includes("twitter") ||
-				url.includes("redirect") ||
-				url.includes("javascript") ||
-				url.includes("home-affairs") ||
-				url.includes("case-law") ||
-				url.includes("blog") ||
-				url.includes("fb-messenger") ||
-				url.includes("policy") ||
-				url.includes("linkedin") ||
-				url.includes("rfi.fr") ||
-				url.includes("freemovement.org.uk") ||
-				url.includes("europa.eu") ||
-				url.includes("authenticate")
+			return (
+				(selectedDataset === "uscis"
+					? url.includes("uscis.gov") &&
+					  !url.includes("/es/") &&
+					  !url.includes("password") &&
+					  !url.includes("history")
+					: !url.includes("www.asylumlawdatabase.eu") &&
+					  !url.includes("policy")) &&
+				!url.includes("mailto") &&
+				!url.includes("facebook") &&
+				!url.includes("twitter") &&
+				!url.includes("redirect") &&
+				!url.includes("javascript") &&
+				!url.includes("home-affairs") &&
+				!url.includes("case-law") &&
+				!url.includes("blog") &&
+				!url.includes("fb-messenger") &&
+				!url.includes("linkedin") &&
+				!url.includes("rfi.fr") &&
+				!url.includes("freemovement.org.uk") &&
+				!url.includes("europa.eu") &&
+				!url.includes("authenticate")
 			);
 		},
 		selectedDataset === "uscis"

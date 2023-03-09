@@ -19,40 +19,55 @@ class LinkFollower {
 		private visitedUrlSet = new Set<string>()
 	) {}
 
-	async follow(url: string) {
-		const html = await getHTML(this.urlTransformer(url));
+	async follow(initialUrl: string) {
+		this.concurrencyLimiter.call(this.followRecursive)(initialUrl, this);
+	}
+
+	private async followRecursive(url: string, that: LinkFollower) {
+		// why is "this" undefined
+		const html = await getHTML(that.urlTransformer(url));
 
 		const $ = cheerio.load(html);
 
 		$("a").map((_, elem) => {
 			const node = $(elem);
+
 			let href = node.attr("href");
 
 			if (href === undefined) return;
 
-			if (!this.urlFilter(url) || href[0] === "#") return;
+			if (
+				!that.urlFilter(href) ||
+				href[0] === "#" ||
+				href.endsWith(".pdf") ||
+				href.endsWith(".xlsx")
+			)
+				return;
 
 			if (href[0] === "/") {
 				href = url.slice(0, url.indexOf("/", 8)) + href;
 			}
 
-			if (this.visitedUrlSet.has(href)) {
+			if (that.visitedUrlSet.has(href)) {
 				return;
 			}
 
-			this.visitedUrlSet.add(href);
+			that.visitedUrlSet.add(href);
 
-			if (this.visitedUrlSet.size % this.everyN.n === 0) {
-				this.everyN.do(this.visitedUrlSet.size);
+			if (that.visitedUrlSet.size % that.everyN.n === 0) {
+				that.everyN.do(that.visitedUrlSet.size);
 			}
 
 			(async () => {
 				try {
-					await this.concurrencyLimiter.call(this.follow)(href);
+					await that.concurrencyLimiter.call(that.followRecursive)(
+						href,
+						that
+					);
 
-					this.onSuccess({ url: href });
+					that.onSuccess({ url: href });
 				} catch (error) {
-					this.onError({ url: href, error });
+					that.onError({ url: href, error });
 				}
 			})();
 		});

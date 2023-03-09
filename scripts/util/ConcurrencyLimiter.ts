@@ -46,6 +46,10 @@ class ConcurrencyLimiter {
 			this.onCompletion({ functionsRunning });
 
 			if (functionsRunning === 0) {
+				await new Promise((res) => setTimeout(res, 10000));
+
+				if (functionsRunning !== 0) return;
+
 				this.onZeroConcurrency();
 			}
 		};
