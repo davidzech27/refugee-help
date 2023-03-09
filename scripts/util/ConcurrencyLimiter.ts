@@ -1,56 +1,55 @@
 class ConcurrencyLimiter {
-  constructor(
-    private readonly maxConcurrency: number,
-    private functionCalls = 0,
-    private functionCompletions = 0
-  ) {}
+	constructor(
+		private readonly maxConcurrency: number,
+		private onCompletion: ({
+			functionsRunning,
+		}: {
+			functionsRunning: number;
+		}) => void,
+		private onZeroConcurrency: () => void,
+		private functionCalls = 0,
+		private functionCompletions = 0
+	) {}
 
-  call<TArgs extends any[]>({
-    fn,
-    onCompletion,
-    onZeroConcurrency,
-  }: {
-    fn: (...args: TArgs) => Promise<any>;
-    onCompletion: ({ functionsRunning }: { functionsRunning: number }) => void;
-    onZeroConcurrency: () => void;
-  }) {
-    return async (...args: TArgs) => {
-      if (
-        this.functionCalls - this.functionCompletions >=
-        this.maxConcurrency
-      ) {
-        // suboptimal
-        await new Promise((res) => {
-          const intervalId = setInterval(() => {
-            if (
-              this.functionCalls - this.functionCompletions <
-              this.maxConcurrency
-            ) {
-              clearInterval(intervalId);
+	call<TArgs extends any[]>(fn: (...args: TArgs) => Promise<any>) {
+		return async (...args: TArgs) => {
+			if (
+				this.functionCalls - this.functionCompletions >=
+				this.maxConcurrency
+			) {
+				// suboptimal
+				await new Promise((res) => {
+					const intervalId = setInterval(() => {
+						if (
+							this.functionCalls - this.functionCompletions <
+							this.maxConcurrency
+						) {
+							clearInterval(intervalId);
 
-              this.functionCalls++;
+							this.functionCalls++;
 
-              fn(...args).then(res);
-            }
-          }, 100);
-        });
-      } else {
-        this.functionCalls++;
+							fn(...args).then(res);
+						}
+					}, 100);
+				});
+			} else {
+				this.functionCalls++;
 
-        await fn(...args);
-      }
+				await fn(...args);
+			}
 
-      this.functionCompletions++;
+			this.functionCompletions++;
 
-      const functionsRunning = this.functionCalls - this.functionCompletions;
+			const functionsRunning =
+				this.functionCalls - this.functionCompletions;
 
-      onCompletion({ functionsRunning });
+			this.onCompletion({ functionsRunning });
 
-      if (functionsRunning === 0) {
-        onZeroConcurrency();
-      }
-    };
-  }
+			if (functionsRunning === 0) {
+				this.onZeroConcurrency();
+			}
+		};
+	}
 }
 
 export default ConcurrencyLimiter;
