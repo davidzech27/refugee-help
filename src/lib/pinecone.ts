@@ -8,7 +8,7 @@ export type SiteSegmentVector = {
 	metadata: { text: string; url: string; siteTitle: string };
 };
 
-type PineconeIndex = ReturnType<typeof pinecone.Index>;
+export type PineconeIndex = ReturnType<typeof pinecone.Index>;
 
 const pinecone = new PineconeClient();
 

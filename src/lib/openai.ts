@@ -11,18 +11,9 @@ const openai = new OpenAIApi(
 	})
 );
 
-export const getFirstCompletion = async ({
-	prompt,
-	query,
-}: {
-	prompt: string;
-	query: string;
-}) => {
-	const messages: ChatCompletionRequestMessage[] = [
-		{ role: "system", content: prompt },
-		{ role: "user", content: query },
-	];
-
+export const getCompletion = async (
+	messages: ChatCompletionRequestMessage[]
+) => {
 	return (
 		await openai.createChatCompletion({
 			messages,
@@ -48,21 +39,4 @@ export const getEmbedding = async ({ text }: { text: string }) => {
 			model: "text-embedding-ada-002",
 		})
 	).data.data.map(({ embedding }) => embedding)[0]!;
-};
-
-export const getRephrasedQuery = async ({ query }: { query: string }) => {
-	return (
-		await openai.createChatCompletion({
-			messages: [
-				{
-					role: "system",
-					content:
-						"Rephrase upon the following question express the user's intent in a clearer manner. Add additional content if necessary to improve the quality and completeness of the question.",
-				},
-				{ role: "user", content: query },
-			],
-			model: "gpt-3.5-turbo",
-			temperature: 0,
-		})
-	).data.choices[0]!.message!.content;
 };
