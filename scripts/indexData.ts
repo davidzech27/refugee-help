@@ -1,86 +1,45 @@
-import * as cheerio from "cheerio";
-import readline from "readline";
-import chalk from "chalk";
-import { scraperApiKey } from "./lib/scraperApiKey";
-import { PineconeClient } from "@pinecone-database/pinecone";
-import env from "~/env";
-import { redis } from "~/lib/redis";
-import { OpenAIApi, Configuration } from "openai";
-import crypto from "crypto";
-
-const keys = {
-  asylumineurope: {
-    htmlData: "asylumineuropehtmldata",
-  },
-  uscis: {
-    htmlData: "uscishtmldata",
-  },
-};
-
-export type PineconeVector = {
-  id: string;
-  values: number[];
-  metadata: { text: string };
-};
-
+import selectedDataset from "./selectedDataset";
+import { getEmbeddings } from "~/lib/openai";
+import { redis, keys } from "~/lib/redis";
+import { upsertSite, getDataIndex } from "~/lib/pinecone";
+// potentially parellize if using bigger dataset
 const main = async () => {
-  const pinecone = new PineconeClient();
+	const dataIndex = await getDataIndex();
 
-  const openai = new OpenAIApi(
-    new Configuration({
-      apiKey: env.OPENAI_SECRET_KEY,
-    })
-  );
+	const urls = (
+		await redis.scan(0, {
+			match: keys[selectedDataset].urlData({ url: "" }) + "*",
+			count: 100000,
+		})
+	)[1].map((key) => key.split(":").slice(2).join(":") as string);
 
-  await pinecone.init({
-    environment: env.PINECONE_ENVIRONMENT,
-    apiKey: env.PINECONE_API_KEY,
-  });
+	for (const url of urls) {
+		const [segments, title] = await Promise.all([
+			redis.smembers(keys[selectedDataset].urlData({ url })),
+			redis.get(
+				keys[selectedDataset].urlTitle({ url })
+			) as Promise<string>,
+		]);
 
-  const index = pinecone.Index(env.PINECONE_INDEX);
+		const embeddings = await getEmbeddings({ text: segments });
 
-  const category = "asylumineurope" satisfies keyof typeof keys;
+		await upsertSite(
+			{
+				url,
+				segments: segments.map((segment, segmentIndex) => ({
+					text: segment,
+					embedding: embeddings[segmentIndex]!,
+				})),
+				title,
+			},
+			selectedDataset,
+			dataIndex
+		);
 
-  let cursor = 0;
+		console.info(url);
+	}
 
-  while (true) {
-    const result = await redis.sscan(keys[category].htmlData, cursor, {
-      count: 100,
-    });
-
-    cursor = result[0];
-
-    console.info("Cursor: ", cursor);
-
-    if (cursor === 0) break;
-
-    const segments = result[1] as string[];
-
-    const embeddings = (
-      await openai.createEmbedding({
-        input: segments,
-        model: "text-embedding-ada-002",
-      })
-    ).data.data.map(({ embedding }) => embedding);
-
-    const vectors: PineconeVector[] = embeddings.map(
-      (embedding, embeddingIndex) => ({
-        id: crypto
-          .createHash("sha256")
-          .update(segments[embeddingIndex]!)
-          .digest("hex"),
-        values: embedding,
-        metadata: { text: segments[embeddingIndex]! },
-      })
-    );
-
-    index.upsert({
-      upsertRequest: {
-        vectors,
-        namespace: category,
-      },
-    });
-  }
+	console.info("Finished");
 };
 
 main();

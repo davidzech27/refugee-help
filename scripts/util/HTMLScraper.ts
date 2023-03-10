@@ -101,7 +101,7 @@ ${text}`
 				} else {
 					this.onLongEnough({
 						url,
-						segments,
+						segments: segments.map((segment) => segment.trim()),
 						title: $("title")
 							.text()
 							.split("|")[0]!
