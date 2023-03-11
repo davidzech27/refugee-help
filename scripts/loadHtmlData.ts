@@ -7,7 +7,7 @@ import makeTerminateFaster from "./util/makeTerminateFaster";
 
 const MAX_CONCURRENT_FUNCTION_CALLS = 10;
 
-const MIN_SEGMENT_WORDS = 50;
+const MIN_SEGMENT_WORDS = 150;
 
 const MIN_URL_WORDS = 100;
 

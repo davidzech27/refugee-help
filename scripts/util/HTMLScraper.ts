@@ -76,7 +76,11 @@ class HTMLScraper {
 
 						urlWords += elemWords;
 
-						if (elemWords < this.minSegmentWords) {
+						if (
+							elemWords +
+								previousIncompleteText.split(" ").length <
+							this.minSegmentWords
+						) {
 							previousIncompleteText += `
 ${text}`;
 						} else {

@@ -36,6 +36,16 @@ class LinkFollower {
 
 			if (href === undefined) return;
 
+			if (href.length > 1 && href.at(-1) === "/") {
+				href = href.slice(0, href.length - 1);
+			}
+
+			const indexOfHashtag = href.indexOf("#");
+
+			if (indexOfHashtag !== -1) {
+				href = href.slice(0, indexOfHashtag);
+			}
+
 			if (
 				!that.urlFilter(href) ||
 				href[0] === "#" ||

@@ -1,69 +1,107 @@
 import readline from "readline";
-import {
-	getEmbedding,
-	getCompletion,
-	getRephrasedQuery,
-	getSuggestedFollowUpQuestions,
-} from "~/lib/openai";
-import { getNearestEmbeddings, getDataIndex } from "~/lib/pinecone";
-import promptBuilder from "~/util/promptBuilder";
+import { getEmbedding, getCompletion } from "~/lib/openai";
+import { getNearestEmbeddings } from "~/lib/pinecone";
 import { type Dataset } from "~/lib/datasets";
 import { type PineconeIndex } from "~/lib/pinecone";
 
 class QueryLoop {
-	private readonly prompt: ({
+	private readonly rephraseQueryPrompt?: ({
+		query,
+		previousQuery,
+		previousCompletion,
+	}: {
+		query: string;
+		previousQuery?: string;
+		previousCompletion?: string;
+	}) => string;
+	private readonly transformQuery?: ({ query }: { query: string }) => string;
+	private readonly completionPrompt: ({
 		information,
 	}: {
 		information: string[];
 	}) => string;
-	private readonly rephraseQueryPrompt?: ({
-		query,
-	}: {
-		query: string;
-	}) => string;
-	private readonly followUpQuestionsPrompt: ({
+	private readonly transformCompletion: ({
 		completion,
+		relevantUrls,
 	}: {
 		completion: string;
+		relevantUrls: string[];
+	}) => { answer: string; citedUrls: string[] };
+	private readonly followUpQuestionsPrompt: ({
+		answer,
+	}: {
+		answer: string;
 	}) => string;
+	private readonly transformFollowUpQuestions: ({
+		followUpQuestions,
+	}: {
+		followUpQuestions: string;
+	}) => string[];
 	private readonly numberOfSources: number;
 	private readonly dataset: Dataset;
 	private readonly dataIndex: PineconeIndex;
 
 	constructor({
-		prompt,
 		rephraseQueryPrompt,
+		transformQuery,
+		completionPrompt,
+		transformCompletion,
 		followUpQuestionsPrompt,
+		transformFollowUpQuestions,
 		numberOfSources,
 		dataset,
 		dataIndex,
 	}: {
-		prompt: ({ information }: { information: string[] }) => string;
-		rephraseQueryPrompt?: ({ query }: { query: string }) => string;
-		followUpQuestionsPrompt: ({
+		rephraseQueryPrompt?: ({
+			query,
+			previousQuery,
+			previousCompletion,
+		}: {
+			query: string;
+			previousQuery?: string;
+			previousCompletion?: string;
+		}) => string;
+		transformQuery?: ({ query }: { query: string }) => string;
+		completionPrompt: ({
+			information,
+		}: {
+			information: string[];
+		}) => string;
+		transformCompletion: ({
 			completion,
+			relevantUrls,
 		}: {
 			completion: string;
-		}) => string;
+			relevantUrls: string[];
+		}) => { answer: string; citedUrls: string[] };
+		followUpQuestionsPrompt: ({ answer }: { answer: string }) => string;
+		transformFollowUpQuestions: ({
+			followUpQuestions,
+		}: {
+			followUpQuestions: string;
+		}) => string[];
 		numberOfSources: number;
 		dataset: Dataset;
 		dataIndex: PineconeIndex;
 	}) {
-		this.prompt = prompt;
 		this.rephraseQueryPrompt = rephraseQueryPrompt;
+		this.transformQuery = transformQuery;
+		this.completionPrompt = completionPrompt;
+		this.transformCompletion = transformCompletion;
 		this.followUpQuestionsPrompt = followUpQuestionsPrompt;
+		this.transformFollowUpQuestions = transformFollowUpQuestions;
 		this.numberOfSources = numberOfSources;
 		this.dataset = dataset;
 		this.dataIndex = dataIndex;
 	}
 
 	async begin() {
-		const queriesAndCompletions: Parameters<typeof getCompletion>[0] = [];
+		const queriesAndAnswers: Parameters<typeof getCompletion>[0] = [];
 
 		while (true) {
 			let query = "";
 
-			process.stdout.write("Query: ");
+			console.info("Query: ");
 
 			const lines = readline.createInterface({
 				input: process.stdin,
@@ -79,15 +117,25 @@ class QueryLoop {
 				query = await getCompletion([
 					{
 						role: "system",
-						content: this.rephraseQueryPrompt({ query }),
+						content: this.rephraseQueryPrompt({
+							query,
+							previousQuery: queriesAndAnswers.at(-2)?.content,
+							previousCompletion:
+								queriesAndAnswers.at(-1)?.content,
+						}),
 					},
 				]);
 
+				this.transformQuery && (query = this.transformQuery({ query }));
+
+				console.info("Rephrased query:");
+				console.info(query);
 				console.info();
-				console.info("Rephrased query: " + query);
+			} else {
+				this.transformQuery && (query = this.transformQuery({ query }));
 			}
 
-			queriesAndCompletions.push({ role: "user", content: query });
+			queriesAndAnswers.push({ role: "user", content: query });
 
 			const queryEmbedding = await getEmbedding({ text: query });
 
@@ -98,38 +146,59 @@ class QueryLoop {
 				dataIndex: this.dataIndex,
 			});
 
-			const prompt = this.prompt({
+			const prompt = this.completionPrompt({
 				information: informationMatches.map(
 					(info) => info.metadata.text
 				),
 			});
 
+			console.info("Prompt:");
+			console.info(prompt);
 			console.info();
-			console.info("Prompt: " + prompt);
 
-			const completion = await getCompletion([
+			const rawCompletion = await getCompletion([
 				{ role: "system", content: prompt },
-				...queriesAndCompletions, // consider using unrephrased query here
+				...queriesAndAnswers, // consider using unrephrased query here
 			]);
 
-			queriesAndCompletions.push({
-				role: "assistant",
-				content: completion,
+			const { answer, citedUrls } = this.transformCompletion({
+				completion: rawCompletion,
+				relevantUrls: informationMatches.map(
+					(info) => info.metadata.url
+				),
 			});
 
-			console.info();
-			console.info("Completion: " + completion);
+			queriesAndAnswers.push({
+				role: "assistant",
+				content: answer,
+			});
 
-			const suggestedFollowUpQuestions = await getCompletion([
-				{
-					role: "system",
-					content: this.followUpQuestionsPrompt({ completion }),
-				},
-			]);
-
+			console.info("Answer:");
+			console.info(answer);
 			console.info();
+
+			const suggestedFollowUpQuestions = this.transformFollowUpQuestions({
+				followUpQuestions: await getCompletion([
+					{
+						role: "system",
+						content: this.followUpQuestionsPrompt({ answer }),
+					},
+				]),
+			});
+
+			console.info("Cited urls: ");
+			for (const citedUrl of citedUrls) {
+				console.info(citedUrl);
+			}
+			console.info();
+
 			console.info(
-				"Suggested follow-up questions: " + suggestedFollowUpQuestions
+				"Suggested follow-up questions: " +
+					suggestedFollowUpQuestions.map(
+						(suggestedFollowUpQuestion) =>
+							`
+${suggestedFollowUpQuestion}`
+					)
 			);
 		}
 	}
