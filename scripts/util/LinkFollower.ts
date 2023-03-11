@@ -58,11 +58,19 @@ class LinkFollower {
 				href = url.slice(0, url.indexOf("/", 8)) + href;
 			}
 
-			if (that.visitedUrlSet.has(href)) {
+			if (href.at(-1) === "/") {
+				href = href.slice(0, href.length - 1);
+			}
+
+			const visitedUrlSetUrl = href
+				.replace("https://", "")
+				.replace("http://", "");
+
+			if (that.visitedUrlSet.has(visitedUrlSetUrl)) {
 				return;
 			}
 
-			that.visitedUrlSet.add(href);
+			that.visitedUrlSet.add(visitedUrlSetUrl);
 
 			if (that.visitedUrlSet.size % that.everyN.n === 0) {
 				that.everyN.do(that.visitedUrlSet.size);

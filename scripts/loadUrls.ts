@@ -1,5 +1,4 @@
 import chalk from "chalk";
-import { scraperApiKey } from "./lib/scraperApiKey";
 import { redis } from "~/lib/redis";
 import ConcurrencyLimiter from "./util/ConcurrencyLimiter";
 import makeTerminateFaster from "./util/makeTerminateFaster";
@@ -7,6 +6,7 @@ import LinkFollower from "./util/LinkFollower";
 import { datasetStartingLinks } from "~/lib/datasets";
 import selectedDataset from "./selectedDataset";
 import { keys } from "~/lib/redis";
+import { scraperApiKey } from "./lib/scraperApiKey";
 
 const MAX_CONCURRENT_FUNCTION_CALLS = 10;
 

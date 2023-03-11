@@ -18,13 +18,17 @@ export const getDataIndex = async () => {
 		apiKey: env.PINECONE_API_KEY,
 	});
 
-	if (
-		(
-			await pinecone.describeIndex({
-				indexName: env.PINECONE_INDEX,
-			})
-		).database === undefined
-	) {
+	try {
+		if (
+			(
+				await pinecone.describeIndex({
+					indexName: env.PINECONE_INDEX,
+				})
+			).database === undefined
+		) {
+			throw new Error();
+		}
+	} catch {
 		await pinecone.createIndex({
 			createRequest: {
 				name: env.PINECONE_INDEX,

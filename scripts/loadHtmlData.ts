@@ -7,7 +7,7 @@ import makeTerminateFaster from "./util/makeTerminateFaster";
 
 const MAX_CONCURRENT_FUNCTION_CALLS = 10;
 
-const MIN_SEGMENT_WORDS = 150;
+const MIN_SEGMENT_WORDS = 225;
 
 const MIN_URL_WORDS = 100;
 
@@ -31,7 +31,13 @@ const main = async () => {
 		async ({ url, segments, title }) => {
 			if (url.endsWith("sitemap")) return;
 
-			console.info(chalk.green(`${title}: ${url}`));
+			console.info(
+				chalk.green(`${title}: ${url}
+${segments.join(`
+#####
+`)}
+`)
+			);
 
 			try {
 				await Promise.all([
