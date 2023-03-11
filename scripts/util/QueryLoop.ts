@@ -187,19 +187,13 @@ class QueryLoop {
 			});
 
 			console.info("Cited urls: ");
-			for (const citedUrl of citedUrls) {
-				console.info(citedUrl);
-			}
+
 			console.info();
 
-			console.info(
-				"Suggested follow-up questions: " +
-					suggestedFollowUpQuestions.map(
-						(suggestedFollowUpQuestion) =>
-							`
-${suggestedFollowUpQuestion}`
-					)
-			);
+			console.info("Suggested follow-up questions: ");
+			for (const suggestedFollowUpQuestion of suggestedFollowUpQuestions) {
+				console.info(suggestedFollowUpQuestion);
+			}
 		}
 	}
 }
