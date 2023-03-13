@@ -3,40 +3,68 @@ import {
 	Configuration,
 	type ChatCompletionRequestMessage,
 } from "openai";
-import env from "~/env";
 
-const openai = new OpenAIApi(
-	new Configuration({
-		apiKey: env.OPENAI_SECRET_KEY,
-	})
-);
-
-export const getCompletion = async (
-	messages: ChatCompletionRequestMessage[]
-) => {
-	return (
-		await openai.createChatCompletion({
-			messages,
-			model: "gpt-3.5-turbo",
-			temperature: 0,
+const OpenAI = ({ apiKey }: { apiKey: string }) => {
+	const openai = new OpenAIApi(
+		new Configuration({
+			apiKey,
 		})
-	).data.choices[0]!.message!.content;
+	);
+
+	return {
+		getCompletion: async (messages: ChatCompletionRequestMessage[]) => {
+			return (
+				(await (
+					await fetch("https://api.openai.com/v1/chat/completions", {
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${apiKey}`,
+						},
+						method: "POST",
+						body: JSON.stringify({
+							messages,
+							model: "gpt-3.5-turbo",
+							temperature: 0,
+						}),
+					})
+				).json()) as { choices: { message: { content: string } }[] }
+			).choices[0]!.message.content;
+		},
+		getEmbedding: async ({ text }: { text: string }) => {
+			return (
+				(await (
+					await fetch("https://api.openai.com/v1/embeddings", {
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${apiKey}`,
+						},
+						method: "POST",
+						body: JSON.stringify({
+							input: text,
+							model: "text-embedding-ada-002",
+						}),
+					})
+				).json()) as { data: { embedding: number[] }[] }
+			).data.map(({ embedding }) => embedding)[0]!;
+		},
+		getEmbeddings: async ({ text }: { text: string[] }) => {
+			return (
+				(await (
+					await fetch("https://api.openai.com/v1/embeddings", {
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${apiKey}`,
+						},
+						method: "POST",
+						body: JSON.stringify({
+							input: text,
+							model: "text-embedding-ada-002",
+						}),
+					})
+				).json()) as { data: { embedding: number[] }[] }
+			).data.map(({ embedding }) => embedding);
+		},
+	};
 };
 
-export const getEmbeddings = async ({ text }: { text: string[] }) => {
-	return (
-		await openai.createEmbedding({
-			input: text,
-			model: "text-embedding-ada-002",
-		})
-	).data.data.map(({ embedding }) => embedding);
-};
-
-export const getEmbedding = async ({ text }: { text: string }) => {
-	return (
-		await openai.createEmbedding({
-			input: text,
-			model: "text-embedding-ada-002",
-		})
-	).data.data.map(({ embedding }) => embedding)[0]!;
-};
+export default OpenAI;

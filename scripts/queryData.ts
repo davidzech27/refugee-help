@@ -1,10 +1,7 @@
-import { getDataIndex } from "~/lib/pinecone";
 import selectedDataset from "./selectedDataset";
 import QueryLoop from "./util/QueryLoop";
 
 const main = async () => {
-	const dataIndex = await getDataIndex();
-
 	const queryLoop = new QueryLoop({
 		rephraseQueryPrompt: ({ query, previousQuery, previousCompletion }) => {
 			if (!previousQuery || !previousCompletion) {
@@ -22,7 +19,7 @@ New question: ${query}`;
 			}
 		},
 		completionPrompt: ({ information }) =>
-			`You are a very knowledgeable assistant to people with questions about the process of immigrating to the US, who gives extremely useful answers, but avoids a conversational tone. Your answers should be specific and detailed, but concise and easy to understand. Based on the following background information, you will answer the user's question. Ignore information irrelevant to the user's question. There are 2 important considerations to keep in mind while answering users' questions: 1. The user may have a hard time getting access to information themselves, and will rely on the answers you provide to a great extent. 2.  Users are most likely currently attempting to immigrate to the US, so they likely do not have access to very many resources.${information.map(
+			`You are a very knowledgeable assistant to people with questions about the process of immigrating to the US, who gives extremely useful answers, but avoids a conversational tone. Your answers should be specific and detailed, but concise and easy to understand. Based on the following background information, you will answer the user's question. Ignore information irrelevant to the user's question. There are 2 important considerations to keep in mind while answering users' questions: 1. The user may have a hard time getting access to information themselves, and will rely on the answers you provide to a great extent. 2.  Users are most likely currently attempting to immigrate to the US, so they likely do not have access to very many resources.${information.map(
 				(info, infoIndex) =>
 					`
 
@@ -41,12 +38,14 @@ ${infoIndex}: ${info}`
 		},
 		followUpQuestionsPrompt: ({
 			answer,
-		}) => `Based on the following answer, suggest a few simple and concise follow-up questions that could be found on the USCIS website, from the perspective of someone that is currently attempting to immigrate to the US, and needs to understand the provided answer. Separate the questions using new lines, and use a dash before each question.".
+			query,
+		}) => `Based on the following initial question and answer, suggest three simple and concise follow-up questions that could be found on the USCIS website, from the perspective of someone that is currently attempting to immigrate to the US, and needs to understand the provided answer. Separate the questions using new lines, and use a dash before each question.".
+
+Initial question: ${query}
 
 Answer: ${answer}`,
 		numberOfSources: 8,
 		dataset: selectedDataset,
-		dataIndex,
 		transformFollowUpQuestions: ({ followUpQuestions }) =>
 			followUpQuestions
 				.split(

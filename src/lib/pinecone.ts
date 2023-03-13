@@ -1,6 +1,5 @@
 import { PineconeClient } from "@pinecone-database/pinecone";
 import type { Dataset } from "./datasets";
-import env from "~/env";
 
 export type SiteSegmentVector = {
 	id: string;
@@ -12,17 +11,25 @@ export type PineconeIndex = ReturnType<typeof pinecone.Index>;
 
 const pinecone = new PineconeClient();
 
-export const getDataIndex = async () => {
+export const initializePineconeIndex = async ({
+	apiKey,
+	indexName,
+	environment,
+}: {
+	apiKey: string;
+	indexName: string;
+	environment: string;
+}) => {
 	await pinecone.init({
-		environment: env.PINECONE_ENVIRONMENT,
-		apiKey: env.PINECONE_API_KEY,
+		environment,
+		apiKey,
 	});
 
 	try {
 		if (
 			(
 				await pinecone.describeIndex({
-					indexName: env.PINECONE_INDEX,
+					indexName,
 				})
 			).database === undefined
 		) {
@@ -31,15 +38,77 @@ export const getDataIndex = async () => {
 	} catch {
 		await pinecone.createIndex({
 			createRequest: {
-				name: env.PINECONE_INDEX,
+				name: indexName,
 				dimension: 1536,
 				podType: "p1",
 				metadataConfig: { indexed: ["url"] },
 			},
 		});
 	}
+};
 
-	return pinecone.Index(env.PINECONE_INDEX);
+const Pinecone = async ({
+	apiKey,
+	indexName,
+	environment,
+	dataset,
+}: {
+	apiKey: string;
+	indexName: string;
+	environment: string;
+	dataset: Dataset;
+}) => {
+	await pinecone.init({
+		environment,
+		apiKey,
+	});
+
+	const dataIndex = pinecone.Index(indexName);
+
+	return {
+		upsertSite: async (site: {
+			url: string;
+			title: string;
+			segments: { text: string; embedding: number[] }[];
+		}) => {
+			const vectors: SiteSegmentVector[] = site.segments.map(
+				(segment, segmentIndex) => ({
+					id: serializeId({ url: site.url, segmentIndex }),
+					values: segment.embedding,
+					metadata: {
+						text: segment.text,
+						url: site.url,
+						siteTitle: site.title,
+					},
+				})
+			);
+
+			await dataIndex.upsert({
+				upsertRequest: {
+					namespace: dataset,
+					vectors,
+				},
+			});
+		},
+		getNearestEmbeddings: async ({
+			embedding,
+			topK,
+		}: {
+			embedding: number[];
+			topK: number;
+		}) => {
+			return (
+				await dataIndex.query({
+					queryRequest: {
+						topK,
+						includeMetadata: true,
+						namespace: dataset,
+						vector: embedding,
+					},
+				})
+			).matches as SiteSegmentVector[];
+		},
+	};
 };
 
 const serializeId = ({
@@ -56,54 +125,4 @@ const deserializeId = (id: string) => {
 	return { segmentIndex, url };
 };
 
-export const upsertSite = async (
-	site: {
-		url: string;
-		title: string;
-		segments: { text: string; embedding: number[] }[];
-	},
-	dataset: Dataset,
-	dataIndex: PineconeIndex
-) => {
-	const vectors: SiteSegmentVector[] = site.segments.map(
-		(segment, segmentIndex) => ({
-			id: serializeId({ url: site.url, segmentIndex }),
-			values: segment.embedding,
-			metadata: {
-				text: segment.text,
-				url: site.url,
-				siteTitle: site.title,
-			},
-		})
-	);
-
-	await dataIndex.upsert({
-		upsertRequest: {
-			namespace: dataset,
-			vectors,
-		},
-	});
-};
-
-export const getNearestEmbeddings = async ({
-	embedding,
-	topK,
-	dataIndex,
-	dataset,
-}: {
-	embedding: number[];
-	topK: number;
-	dataIndex: PineconeIndex;
-	dataset: Dataset;
-}) => {
-	return (
-		await dataIndex.query({
-			queryRequest: {
-				topK,
-				includeMetadata: true,
-				namespace: dataset,
-				vector: embedding,
-			},
-		})
-	).matches as SiteSegmentVector[];
-};
+export default Pinecone;

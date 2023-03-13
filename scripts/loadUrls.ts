@@ -1,12 +1,11 @@
 import chalk from "chalk";
-import { redis } from "~/lib/redis";
 import ConcurrencyLimiter from "./util/ConcurrencyLimiter";
 import makeTerminateFaster from "./util/makeTerminateFaster";
 import LinkFollower from "./util/LinkFollower";
 import { datasetStartingLinks } from "~/lib/datasets";
 import selectedDataset from "./selectedDataset";
-import { keys } from "~/lib/redis";
-import { scraperApiKey } from "./lib/scraperApiKey";
+import Redis, { keys } from "~/lib/redis";
+import env from "./env";
 
 const MAX_CONCURRENT_FUNCTION_CALLS = 10;
 
@@ -25,6 +24,8 @@ const concurrencyLimiter = new ConcurrencyLimiter(
 makeTerminateFaster();
 
 const main = async () => {
+	const redis = Redis({ url: env.REDIS_URL, token: env.REDIS_TOKEN });
+
 	const linkFollower = new LinkFollower(
 		({ url }) => {
 			console.info(chalk.green(url));
@@ -58,9 +59,9 @@ const main = async () => {
 				!url.includes("authenticate")
 			);
 		},
-		selectedDataset === "uscis"
+		selectedDataset === "uscis" && env.SCRAPER_API_KEY !== undefined
 			? (url) => {
-					return `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${url}`.replace(
+					return `http://api.scraperapi.com?api_key=${env.SCRAPER_API_KEY}&url=${url}`.replace(
 						"uscis.go/",
 						"uscis.gov/"
 					);

@@ -1,0 +1,11 @@
+name = "refugee-information"
+main = "src/index.ts"
+compatibility_date = "2023-03-12"
+
+# secrets
+#
+# PINECONE_API_KEY
+# PINECONE_ENVIRONMENT
+# PINECONE_INDEX
+# OPENAI_SECRET_KEY
+# WHATSAPP_WEBHOOK_TOKEN

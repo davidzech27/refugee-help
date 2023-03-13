@@ -1,9 +1,10 @@
 import chalk from "chalk";
-import { redis, keys } from "~/lib/redis";
+import Redis, { keys } from "~/lib/redis";
 import selectedDataset from "./selectedDataset";
 import HTMLScraper from "./util/HTMLScraper";
 import ConcurrencyLimiter from "./util/ConcurrencyLimiter";
 import makeTerminateFaster from "./util/makeTerminateFaster";
+import env from "./env";
 
 const MAX_CONCURRENT_FUNCTION_CALLS = 10;
 
@@ -26,6 +27,8 @@ const concurrencyLimiter = new ConcurrencyLimiter(
 makeTerminateFaster();
 
 const main = async () => {
+	const redis = Redis({ url: env.REDIS_URL, token: env.REDIS_TOKEN });
+
 	const htmlScraper = new HTMLScraper(
 		concurrencyLimiter,
 		async ({ url, segments, title }) => {

@@ -1,11 +1,14 @@
-import { Redis } from "@upstash/redis";
-import env from "~/env";
+import { Redis as RedisConstructor } from "@upstash/redis";
 import type { Dataset } from "./datasets";
 
-export const redis = new Redis({
-	url: env.REDIS_URL,
-	token: env.REDIS_TOKEN,
-});
+const Redis = ({ url, token }: { url: string; token: string }) => {
+	return new RedisConstructor({
+		url,
+		token,
+	});
+};
+
+export default Redis;
 
 export const keys = {
 	asylumineurope: {

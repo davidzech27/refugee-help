@@ -1,8 +1,8 @@
 import readline from "readline";
-import { getEmbedding, getCompletion } from "~/lib/openai";
-import { getNearestEmbeddings } from "~/lib/pinecone";
+import OpenAI from "~/lib/openai";
+import Pinecone from "~/lib/pinecone";
 import { type Dataset } from "~/lib/datasets";
-import { type PineconeIndex } from "~/lib/pinecone";
+import env from "scripts/env";
 
 class QueryLoop {
 	private readonly rephraseQueryPrompt?: ({
@@ -29,8 +29,10 @@ class QueryLoop {
 	}) => { answer: string; citedUrls: string[] };
 	private readonly followUpQuestionsPrompt: ({
 		answer,
+		query,
 	}: {
 		answer: string;
+		query: string;
 	}) => string;
 	private readonly transformFollowUpQuestions: ({
 		followUpQuestions,
@@ -39,7 +41,6 @@ class QueryLoop {
 	}) => string[];
 	private readonly numberOfSources: number;
 	private readonly dataset: Dataset;
-	private readonly dataIndex: PineconeIndex;
 
 	constructor({
 		rephraseQueryPrompt,
@@ -50,7 +51,6 @@ class QueryLoop {
 		transformFollowUpQuestions,
 		numberOfSources,
 		dataset,
-		dataIndex,
 	}: {
 		rephraseQueryPrompt?: ({
 			query,
@@ -74,7 +74,13 @@ class QueryLoop {
 			completion: string;
 			relevantUrls: string[];
 		}) => { answer: string; citedUrls: string[] };
-		followUpQuestionsPrompt: ({ answer }: { answer: string }) => string;
+		followUpQuestionsPrompt: ({
+			answer,
+			query,
+		}: {
+			answer: string;
+			query: string;
+		}) => string;
 		transformFollowUpQuestions: ({
 			followUpQuestions,
 		}: {
@@ -82,7 +88,6 @@ class QueryLoop {
 		}) => string[];
 		numberOfSources: number;
 		dataset: Dataset;
-		dataIndex: PineconeIndex;
 	}) {
 		this.rephraseQueryPrompt = rephraseQueryPrompt;
 		this.transformQuery = transformQuery;
@@ -92,11 +97,19 @@ class QueryLoop {
 		this.transformFollowUpQuestions = transformFollowUpQuestions;
 		this.numberOfSources = numberOfSources;
 		this.dataset = dataset;
-		this.dataIndex = dataIndex;
 	}
 
 	async begin() {
-		const queriesAndAnswers: Parameters<typeof getCompletion>[0] = [];
+		const openai = OpenAI({ apiKey: env.OPENAI_SECRET_KEY });
+		const pinecone = await Pinecone({
+			dataset: this.dataset,
+			apiKey: env.PINECONE_API_KEY,
+			indexName: env.PINECONE_INDEX,
+			environment: env.PINECONE_ENVIRONMENT,
+		});
+
+		const queriesAndAnswers: Parameters<typeof openai.getCompletion>[0] =
+			[];
 
 		while (true) {
 			let query = "";
@@ -114,17 +127,20 @@ class QueryLoop {
 			}
 
 			if (this.rephraseQueryPrompt !== undefined) {
-				query = await getCompletion([
-					{
-						role: "system",
-						content: this.rephraseQueryPrompt({
-							query,
-							previousQuery: queriesAndAnswers.at(-2)?.content,
-							previousCompletion:
-								queriesAndAnswers.at(-1)?.content,
-						}),
-					},
-				]);
+				query = (
+					await openai.getCompletion([
+						{
+							role: "system",
+							content: this.rephraseQueryPrompt({
+								query,
+								previousQuery:
+									queriesAndAnswers.at(-2)?.content,
+								previousCompletion:
+									queriesAndAnswers.at(-1)?.content,
+							}),
+						},
+					])
+				).trim();
 
 				this.transformQuery && (query = this.transformQuery({ query }));
 
@@ -137,13 +153,11 @@ class QueryLoop {
 
 			queriesAndAnswers.push({ role: "user", content: query });
 
-			const queryEmbedding = await getEmbedding({ text: query });
+			const queryEmbedding = await openai.getEmbedding({ text: query });
 
-			const informationMatches = await getNearestEmbeddings({
+			const informationMatches = await pinecone.getNearestEmbeddings({
 				embedding: queryEmbedding,
 				topK: this.numberOfSources,
-				dataset: this.dataset,
-				dataIndex: this.dataIndex,
 			});
 
 			const prompt = this.completionPrompt({
@@ -156,7 +170,7 @@ class QueryLoop {
 			console.info(prompt);
 			console.info();
 
-			const rawCompletion = await getCompletion([
+			const rawCompletion = await openai.getCompletion([
 				{ role: "system", content: prompt },
 				...queriesAndAnswers, // consider using unrephrased query here
 			]);
@@ -178,16 +192,21 @@ class QueryLoop {
 			console.info();
 
 			const suggestedFollowUpQuestions = this.transformFollowUpQuestions({
-				followUpQuestions: await getCompletion([
+				followUpQuestions: await openai.getCompletion([
 					{
 						role: "system",
-						content: this.followUpQuestionsPrompt({ answer }),
+						content: this.followUpQuestionsPrompt({
+							answer,
+							query,
+						}),
 					},
 				]),
 			});
 
 			console.info("Cited urls: ");
-
+			for (const citedUrl of citedUrls) {
+				console.info(citedUrl);
+			}
 			console.info();
 
 			console.info("Suggested follow-up questions: ");

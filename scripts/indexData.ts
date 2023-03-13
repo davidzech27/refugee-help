@@ -1,10 +1,27 @@
 import selectedDataset from "./selectedDataset";
-import { getEmbeddings } from "~/lib/openai";
-import { redis, keys } from "~/lib/redis";
-import { upsertSite, getDataIndex } from "~/lib/pinecone";
+import OpenAI from "~/lib/openai";
+import Redis, { keys } from "~/lib/redis";
+import Pinecone, { initializePineconeIndex } from "~/lib/pinecone";
+import env from "./env";
+
 // potentially parellize if using bigger dataset
 const main = async () => {
-	const dataIndex = await getDataIndex();
+	await initializePineconeIndex({
+		apiKey: env.PINECONE_API_KEY,
+		indexName: env.PINECONE_INDEX,
+		environment: env.PINECONE_ENVIRONMENT,
+	});
+
+	const pinecone = await Pinecone({
+		dataset: selectedDataset,
+		apiKey: env.PINECONE_API_KEY,
+		indexName: env.PINECONE_INDEX,
+		environment: env.PINECONE_ENVIRONMENT,
+	});
+
+	const redis = Redis({ url: env.REDIS_URL, token: env.REDIS_TOKEN });
+
+	const openai = OpenAI({ apiKey: env.OPENAI_SECRET_KEY });
 
 	const urls = (
 		await redis.scan(0, {
@@ -21,20 +38,16 @@ const main = async () => {
 			) as Promise<string>,
 		]);
 
-		const embeddings = await getEmbeddings({ text: segments });
+		const embeddings = await openai.getEmbeddings({ text: segments });
 
-		await upsertSite(
-			{
-				url,
-				segments: segments.map((segment, segmentIndex) => ({
-					text: segment,
-					embedding: embeddings[segmentIndex]!,
-				})),
-				title,
-			},
-			selectedDataset,
-			dataIndex
-		);
+		await pinecone.upsertSite({
+			url,
+			segments: segments.map((segment, segmentIndex) => ({
+				text: segment,
+				embedding: embeddings[segmentIndex]!,
+			})),
+			title,
+		});
 
 		console.info(url);
 	}
