@@ -180,7 +180,7 @@ Question: ${query}`,
 							},
 						])
 					).trim();
-					console.log({ query });
+
 					const [queryEmbedding, pinecone] = await Promise.all([
 						openai.getEmbedding({
 							text: query,
@@ -210,7 +210,7 @@ Question: ${query}`,
 								),
 						],
 					];
-					console.log({ information });
+
 					const answer = (
 						await openai.getCompletion([
 							{

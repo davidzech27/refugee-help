@@ -1,5 +1,5 @@
 import { z } from "zod";
-import "dotenv/config"
+import "dotenv/config";
 
 const schema = z.object({
 	REDIS_URL: z.string(),
@@ -8,7 +8,6 @@ const schema = z.object({
 	PINECONE_ENVIRONMENT: z.string(),
 	PINECONE_INDEX: z.string(),
 	OPENAI_SECRET_KEY: z.string(),
-	WHATSAPP_WEBHOOK_TOKEN: z.string(),
 	SCRAPER_API_KEY: z.string().optional(),
 });
 
