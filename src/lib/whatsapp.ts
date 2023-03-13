@@ -35,11 +35,17 @@ const WhatsApp = {
 		fromPhoneNumberId,
 		toPhoneNumber,
 		body,
+		buttons,
 		metaAccessToken,
 	}: {
 		fromPhoneNumberId: string;
 		toPhoneNumber: string;
 		body: string;
+		buttons: [
+			{ id: string; title: string },
+			{ id: string; title: string },
+			{ id: string; title: string }
+		];
 		metaAccessToken: string;
 	}) => {
 		await fetch(
@@ -54,11 +60,29 @@ const WhatsApp = {
 					messaging_product: "whatsapp",
 					recipient_type: "individual",
 					to: toPhoneNumber,
-					// type: "text",
-					// text: {
-					// 	preview_url: false,
-					// 	body,
-					// },
+					type: "interactive",
+					interactive: {
+						type: "button",
+						body: {
+							text: body,
+						},
+						action: {
+							buttons: [
+								{
+									type: "reply",
+									reply: buttons[0],
+								},
+								{
+									type: "reply",
+									reply: buttons[1],
+								},
+								{
+									type: "reply",
+									reply: buttons[2],
+								},
+							],
+						},
+					},
 				}),
 			}
 		);
